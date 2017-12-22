@@ -1,17 +1,12 @@
-import std.stdio;
 import std.socket;
-import std.algorithm:remove, sort;
-import std.string:assumeUTF, indexOf;
-import std.conv:to;
-import core.thread;
-import std.traits;
 
-abstract class Connection {
+interface Connection {
 public:
-	abstract void setSocket(Socket);
-	abstract void recv(ubyte[] data);
-	abstract ulong send(ubyte[] data);
-	void close() {}
+	void setSocket(Socket);
+	void start();
+	void recv(ubyte[] data);
+	ulong send(ubyte[] data);
+	void close();
 }
 
 class TCPConnection : Connection{
@@ -22,8 +17,11 @@ public:
 	override void setSocket(Socket socket) {
 		this.socket = socket;
 	}
+
+	override void start() {}
 	
 	override void recv(ubyte[] data) {
+		import std.string:assumeUTF;
 		string s = data.assumeUTF;
 		send(cast(ubyte[])s);
 	}
@@ -43,6 +41,7 @@ public:
 	}
 
 	override void close() {
+		import std.stdio;
 		writeln("CLOSE");
 	}
 }
@@ -100,16 +99,20 @@ public:
 
 				if (socketSet.isSet(conn.socket)) {
 					ubyte[1024] buf;
-					// write error check
+					 
+					// error check
 					auto r = conn.socket.receive(buf);
 					if (r == 0 || r == Socket.ERROR) {
 						conn.close();
 						rmlist ~= i;
+						continue;
 					}
 					conn.recv(buf);
 				}
 			}
 
+			// remove closed connection
+			import std.algorithm:remove, sort;
 			foreach (i; rmlist.sort!"a > b") {
 				conns = conns.remove(i);
 			}
